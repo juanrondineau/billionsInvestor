@@ -24,6 +24,7 @@ Execute script
 
 ```bash
 docker run -it \
+    --network=billionsinvestor_default \
     grahamMethod:v001 \
         --user=root \
         --password=root \
