@@ -26,11 +26,20 @@ Execute script
 ```bash
 docker run -it \
     --network=billionsNetwork \
-    grahamMethod:v001 \
+    grahammethod:v001 \
         --user=root \
         --password=root \
         --host=pgdatabase \
         --port=5432 \
         --db=billionsDB \
-        --table_name=grahamStockMetrics
+        --table_name=grahamStockMetrics \
+        --year=2003 \
+        --aplhaVantageApi=APIKEY
+```
+
+## Services
+
+PgAdmin
+```bash
+http://localhost:8080/browser/
 ```
