@@ -1,0 +1,30 @@
+services:
+  pgdatabase:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=billionsDB
+    volumes:
+      - "./data/billionsData:/var/lib/postgresql/data:rw"
+    ports:
+      - "5432:5432"
+    networks:
+      - billionsNetwork
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=root
+    volumes:
+      - "./data/pgadminData:/var/lib/pgadmin/sessions:rw"
+    ports:
+      - "8080:80"
+    networks:
+      - billionsNetwork
+
+networks:
+  billionsNetwork:
+    driver: bridge
+    
