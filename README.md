@@ -8,7 +8,7 @@ Set permission to open data folders.
 ```bash
 sudo chmod a+rwx billionsData
 sudo chmod a+rwx pgadminData
-sudo chown -R 5050:5050 pgadmindata
+sudo chown -R 5050:5050 pgadminData
 ```
 ## Docker Init
 
