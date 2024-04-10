@@ -6,8 +6,9 @@ automatización de método Graham y otras yerbas
 Set permission to open data folders.
 
 ```bash
-sudo chmod -R 777 billionsData
-sudo chmod -R 777 pgAdminData
+sudo chmod a+rwx billionsData
+sudo chmod a+rwx pgAdminData
+sudo chown -R 5050:5050 pgadmin_data
 ```
 ## Docker Init
 
