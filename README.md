@@ -32,5 +32,5 @@ docker run -it \
         --host=pgdatabase \
         --port=5432 \
         --db=billionsDB \
-        --data_table_name=grahamStockMetrics
+        --table_name=grahamStockMetrics
 ```
