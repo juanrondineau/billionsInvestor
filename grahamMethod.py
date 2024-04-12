@@ -35,8 +35,8 @@ def main(params):
                 yFinanceInfo['sectorDisp'],
                 yFinanceInfo['industryDisp'],
                 yFinanceInfo['country'],
-                round(yFinanceInfo['marketCap']/1000000000,2),
-                round(yFinanceInfo['priceToBook'],2),
+                round(yFinanceInfo['marketCap']/1000000000,2) if 'marketCap' in yFinanceInfo.keys() else 0,
+                round(yFinanceInfo['priceToBook'],2) if 'priceToBook' in yFinanceInfo.keys() else 0, 
                 round(yFinanceInfo['dividendYield']*100,2) if 'dividendYield' in yFinanceInfo.keys() else 0,
                 round(yFinanceInfo['payoutRatio']*100,2) if 'payoutRatio' in yFinanceInfo.keys() else 0,
                 yFinanceInfo['trailingEps'],
@@ -44,7 +44,7 @@ def main(params):
                 round(yFinanceInfo['returnOnEquity']*100,2),
                 round(yFinanceInfo['currentRatio'],2),
                 finVizFundamentsInfo['LT Debt/Eq'],
-                round(yFinanceInfo['debtToEquity']/100,2),
+                round(yFinanceInfo['debtToEquity']/100,2) if 'debtToEquity' in yFinanceInfo.keys() else 0,
                 round(yFinanceInfo['currentPrice'],2)
             ]
 
@@ -218,8 +218,8 @@ def main(params):
                                                   .otherwise(col('Value')),2)) \
             .withColumn('Preconditions', (col('P/E') < 20) & (col('P/B') < 3) & (col('EPS growth past 5 years(%)') >= 30) \
                         & (col('LT Debt/Equity') < 1) & (col('MarketCap(BN)') >= 10) & (col('Dividend Yield(%)') > 0) ) \
-            .withColumn('Tes0', col('Pretax Income(M)') >= 50) \
-            .withColumn('Tes1', col('Total Revenue(M)') >= 600) \
+            .withColumn('Test0', col('Pretax Income(M)') >= 50) \
+            .withColumn('Test1', col('Total Revenue(M)') >= 600) \
             .withColumn('Test2-1', col('Current Ratio') >= 2) \
             .withColumn('Test2-2', col('Long Term Debt(M)') < col('Net Current Assets(M)')) \
             .withColumn('Test3', sum(when((col < 0)|(isnan(col)), lit(1)).otherwise(lit(0)) \
@@ -228,7 +228,11 @@ def main(params):
             .withColumn('Test5', col('Growth(%)') >= 66.3) \
             .withColumn('Test6', col('P/E') < 15) \
             .withColumn('Test7', col('PriceToAssets') < 22.5) \
-            .withColumn('Test8', col('Margin of Safety') > 1)
+            .withColumn('Test8', col('Margin of Safety') > 1) 
+
+        columns = sparkDF.columns       
+
+        sparkDF = sparkDF.withColumn('TestPoints', sum(when(x==True, 1).otherwise(0) for x in [col(i) for i in columns if i.startswith('Test')]))            
 
         return sparkDF
     
@@ -240,6 +244,7 @@ def main(params):
     port = params.port 
     db = params.db
     table_name = params.table_name
+    tickers = params.tickers_list
     year = params.year
     aplhaVantageApi = params.aplhaVantageApi
 
@@ -249,7 +254,8 @@ def main(params):
         .appName("juaniInvestor") \
         .getOrCreate()
 
-    tickers = ['WIRE']
+    #tickers = ['ALB']
+    print(tickers)
     finalDF = pd.DataFrame()
 
     finalDF = getStockFundamentals().join(getStockFinancials()) \
@@ -259,15 +265,27 @@ def main(params):
 
 
     sparkDF = getStockCalculus()    
-    sparkDF.printSchema()
-    sparkDF.show()
+    #sparkDF.printSchema()
+    #sparkDF.show()
 
     sparkDF.write.option("header",True) \
         .mode('overwrite') \
         .parquet("data/portfolio_stocks.parquet")
 
+    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
+
+    pandasDF = sparkDF.toPandas()
+
+    pandasDF.to_sql(name=table_name, con=engine, index=False,if_exists='append')
+
+
 
 if __name__ == '__main__':
+    
+    # Define a custom argument type for a list of strings
+    def list_of_strings(arg):
+        return arg.split(',')
+    
     parser = argparse.ArgumentParser(description='Ingest Graham method data to Postgres billionsDB')
 
     parser.add_argument('--user', required=True, help='user name for postgres')
@@ -276,6 +294,7 @@ if __name__ == '__main__':
     parser.add_argument('--port', required=True, help='port for postgres')
     parser.add_argument('--db', required=True, help='database name for postgres')
     parser.add_argument('--table_name', required=True, help='name of the table where we will write the results to')
+    parser.add_argument('--tickers_list', type=list_of_strings, required=True, help='list of tickers for stocks data')    
     parser.add_argument('--year', required=True, help='year for stocks data')    
     parser.add_argument('--aplhaVantageApi', required=True, help='api key for alphaVantage api request')        
 

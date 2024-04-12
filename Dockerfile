@@ -1,11 +1,9 @@
-FROM apache/spark-py
-
+FROM spark:python3-java17
 #FROM python:3.9.1
-#RUN apt-get install wget
 
 USER root
 RUN pip3 install pandas sqlalchemy psycopg2_binary pyarrow yfinance finvizfinance PySpark jupyter
-#"psycopg[binary,pool]" pgcli psycopg2
+#"psycopg[binary,pool]" pgcli psycopg2 
 USER 185
 
 WORKDIR /app
