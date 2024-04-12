@@ -8,20 +8,22 @@ import numpy as np
 import math
 import argparse
 import pyarrow.parquet as pq
+import requests
+import json
 
 from sqlalchemy import create_engine
 from finvizfinance.quote import finvizfinance
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, lit, when, isnan, round as pysparkround
+from pyspark.sql.types import IntegerType
 
 
 def main(params):
     
-    def stockFundamentals():
+    def getStockFundamentals():
         #init variables
         tickersData = []
         
-        print('lista tickers')
-        print(tickers)
-
         for ticker in tickers:
 
             yFinanceInfo = yf.Ticker(ticker).info
@@ -48,7 +50,8 @@ def main(params):
 
             tickersData.append(tickerData)
 
-        columnsNames = ['Ticker','Company','Sector','Industry','Country','MarketCap(BN)','P/B', 'Dividend Yield(%)', 'Payout Ratio (%)', 'EPS(ttm)', 'EPS growth past 5 years(%)','ROE(%)', 'Current Ratio','LT Debt/Equity','Total Debt/Equity', 'Price',]
+        columnsNames = ['Ticker','Company','Sector','Industry','Country','MarketCap(BN)','P/B', 'Dividend Yield(%)', 'Payout Ratio (%)', \
+                         'EPS(ttm)', 'EPS growth past 5 years(%)','ROE(%)', 'Current Ratio','LT Debt/Equity','Total Debt/Equity', 'Price',]
 
         df = pd.DataFrame(tickersData, index = tickers, columns=columnsNames )
 
@@ -56,10 +59,178 @@ def main(params):
         df["E/P (%)"] = round(df["EPS(ttm)"] / df["Price"] * 100,2)
         df["PriceToAssets"] = round((22.5*df["EPS(ttm)"]*df["P/B"]).apply(np.sqrt),2)
 
-        # Change column B and C's values to integers
         df = df.astype({'EPS growth past 5 years(%)': float, 'LT Debt/Equity':float})
 
         return(df)
+    
+    def getStockFinancials():
+        
+        indexList = ['Total Revenue', 'Pretax Income']
+
+        financialsDF = pd.DataFrame(columns=indexList)
+
+        for ticker in tickers:
+
+            tickerFinancialDf = yf.Ticker(ticker).financials
+
+            tickerFinancialTrasposeDf = tickerFinancialDf[tickerFinancialDf.index.isin(indexList)] \
+                .transpose() \
+                .sort_index(ascending=False) \
+                .head(1)
+
+            tickerFinancialTrasposeDf = tickerFinancialTrasposeDf / 1000000
+            tickerFinancialTrasposeDf['Ticker'] = ticker
+            tickerFinancialTrasposeDf = tickerFinancialTrasposeDf.set_index('Ticker')
+
+            financialsDF = pd.concat([financialsDF, tickerFinancialTrasposeDf])
+
+        return financialsDF.rename(columns={'Total Revenue': 'Total Revenue(M)', 'Pretax Income': 'Pretax Income(M)'})
+        
+    def getStockBalanceSheets():
+
+        indexList = ['Total Assets', 'Current Assets', 'Current Liabilities','Long Term Debt']
+
+        balanceSheetDF = pd.DataFrame(columns=indexList)
+
+        for ticker in tickers:
+            tickerBalanceSheetDf = yf.Ticker(ticker).balancesheet
+
+            tickerBalanceSheetTrasposeDf = tickerBalanceSheetDf[tickerBalanceSheetDf.index.isin(indexList)] \
+                .transpose() \
+                .sort_index(ascending=False) \
+                .head(1)
+
+            tickerBalanceSheetTrasposeDf = tickerBalanceSheetTrasposeDf / 1000000
+            tickerBalanceSheetTrasposeDf['Ticker'] = ticker
+            tickerBalanceSheetTrasposeDf = tickerBalanceSheetTrasposeDf.set_index('Ticker')
+            balanceSheetDF = pd.concat([balanceSheetDF, tickerBalanceSheetTrasposeDf])
+
+        balanceSheetDF['Net Current Assets(M)'] = balanceSheetDF['Current Assets'] - \
+                balanceSheetDF['Current Liabilities']
+
+        return balanceSheetDF \
+            .rename(columns={'Total Assets': 'Total Assets(M)', 'Current Assets': 'Current Assets(M)', 'Current Liabilities':'Current Liabilities(M)', \
+                             'Long Term Debt':'Long Term Debt(M)'})
+
+    def getStockDividends():
+
+        tickersDividendData = []
+
+        for ticker in tickers:
+            tickerActionsDf = yf.Ticker(ticker).actions
+
+            if len(tickerActionsDf.index) > 0:
+                tickerActionsDf['Date'] = tickerActionsDf.index
+
+                firstDividendRecordYear = tickerActionsDf.iloc[tickerActionsDf['Date'].argmin()]['Date'].year
+
+                zeroDividendsDF = tickerActionsDf.query("Dividends == 0")
+
+                contDividendsPaymentSince = firstDividendRecordYear if zeroDividendsDF.empty \
+                    else zeroDividendsDF.iloc[zeroDividendsDF['Date'].argmax()]['Date'].year+1
+
+                tickerDividendData = [
+                    firstDividendRecordYear,
+                    contDividendsPaymentSince
+                ]
+            else:
+                tickerDividendData = [
+                    np.nan,
+                    np.nan
+                ]
+
+            tickersDividendData.append(tickerDividendData)
+
+        columnsNames = ['First Dividend Record','Continue Dividends Payment Since']
+
+        return pd.DataFrame(tickersDividendData, index = tickers, columns=columnsNames )
+    
+    def getStockEarnings():
+        earningsConcatDF = pd.DataFrame()
+
+        for ticker in tickers:
+            url = 'https://www.alphavantage.co/query?function=EARNINGS&symbol='+ticker+'&apikey='+aplhaVantageApi
+            r = requests.get(url)
+            data = r.json()['annualEarnings']
+
+            earningsDF=pd.DataFrame(data)
+            earningsDF['Year']=earningsDF['fiscalDateEnding'].str[:4]
+            earningsDF['Ticker'] = ticker
+            earningsDF = earningsDF.drop('fiscalDateEnding', axis=1) \
+                .loc[earningsDF['Year'] <= year] \
+                .sort_values(by=['Year'], ascending=False) \
+                .head(10) \
+                .set_index('Ticker') \
+                .pivot(columns='Year', values='reportedEPS') \
+                .apply(pd.to_numeric)
+            
+            earningsConcatDF = pd.concat([earningsConcatDF, earningsDF])
+        
+        #Cambio los nombres a las columnas de earnings anuales por uno genérico para no tener el año como referencia
+        for num in range(0,10):
+            yearEPS = int(year) - num
+            earningsConcatDF.rename(columns={str(yearEPS):'EPS LastYear'+ ('' if num == 0 else '-'+str(num))}, inplace=True)
+
+        earningsConcatDF = earningsConcatDF.sort_index(axis=1)
+
+        return earningsConcatDF
+    
+    def getStockCalculus() :
+
+        #Create PySpark DataFrame from Pandas
+        sparkDF=spark.createDataFrame(finalDF) \
+            .withColumn('Net Current Assets(M)', pysparkround(col('Net Current Assets(M)'), 2)) \
+            .withColumn('EPS LastYear', pysparkround(col('EPS LastYear'), 2)) \
+            .withColumn('EPS LastYear-1', pysparkround(col('EPS LastYear-1'), 2)) \
+            .withColumn('EPS LastYear-2', pysparkround(col('EPS LastYear-2'), 2)) \
+            .withColumn('EPS LastYear-3', pysparkround(col('EPS LastYear-3'), 2)) \
+            .withColumn('EPS LastYear-4', pysparkround(col('EPS LastYear-4'), 2)) \
+            .withColumn('EPS LastYear-5', pysparkround(col('EPS LastYear-5'), 2)) \
+            .withColumn('EPS LastYear-6', pysparkround(col('EPS LastYear-6'), 2)) \
+            .withColumn('EPS LastYear-7', pysparkround(col('EPS LastYear-7'), 2)) \
+            .withColumn('EPS LastYear-8', pysparkround(col('EPS LastYear-8'), 2)) \
+            .withColumn('EPS LastYear-9', pysparkround(col('EPS LastYear-9'), 2))
+
+        recentlyYearsEPSColumns = [col('EPS LastYear'), \
+                        col('EPS LastYear-1'), \
+                        col('EPS LastYear-2')
+                        ]
+
+        olderYearsEPSColumns = [col('EPS LastYear-7'), \
+                        col('EPS LastYear-8'), \
+                        col('EPS LastYear-9') \
+                        ]
+
+        midYearsEPSColumns = [col('EPS LastYear-3'), \
+                                col('EPS LastYear-4'), \
+                                col('EPS LastYear-5'), \
+                                col('EPS LastYear-6')]
+
+        sparkDF = sparkDF.withColumn('Recently Years EPS Avg', pysparkround(sum(x for x in recentlyYearsEPSColumns) \
+                                                                            /len(recentlyYearsEPSColumns),2)) \
+            .withColumn('Older Years EPS Avg', pysparkround(sum(x for x in olderYearsEPSColumns) \
+                                                            /len(olderYearsEPSColumns),2)) \
+            .withColumn('Growth', pysparkround(col('Recently Years EPS Avg')-col('Older Years EPS Avg'),2)) \
+            .withColumn('Growth(%)', pysparkround(col('Growth')*100/col('Older Years EPS Avg'),2)) \
+            .withColumn('Value', pysparkround(col('EPS LastYear')*(8.5+2*((col('Growth(%)')-31.14)*0.1)),2)) \
+            .withColumn('Margin of Safety', pysparkround(col('Value')/col('Price'),2)) \
+            .withColumn('Max Entry Price', pysparkround(when(col('EPS(ttm)')*15 < col('Value'), col('EPS(ttm)')*15) \
+                                                  .otherwise(col('Value')),2)) \
+            .withColumn('Preconditions', (col('P/E') < 20) & (col('P/B') < 3) & (col('EPS growth past 5 years(%)') >= 30) \
+                        & (col('LT Debt/Equity') < 1) & (col('MarketCap(BN)') >= 10) & (col('Dividend Yield(%)') > 0) ) \
+            .withColumn('Tes0', col('Pretax Income(M)') >= 50) \
+            .withColumn('Tes1', col('Total Revenue(M)') >= 600) \
+            .withColumn('Test2-1', col('Current Ratio') >= 2) \
+            .withColumn('Test2-2', col('Long Term Debt(M)') < col('Net Current Assets(M)')) \
+            .withColumn('Test3', sum(when((col < 0)|(isnan(col)), lit(1)).otherwise(lit(0)) \
+                                     for col in recentlyYearsEPSColumns + olderYearsEPSColumns + midYearsEPSColumns) == 0) \
+            .withColumn('Test4', (year-col('Continue Dividends Payment Since')).cast(IntegerType()) >= 20) \
+            .withColumn('Test5', col('Growth(%)') >= 66.3) \
+            .withColumn('Test6', col('P/E') < 15) \
+            .withColumn('Test7', col('PriceToAssets') < 22.5) \
+            .withColumn('Test8', col('Margin of Safety') > 1)
+
+        return sparkDF
     
     #params init
     
@@ -72,11 +243,29 @@ def main(params):
     year = params.year
     aplhaVantageApi = params.aplhaVantageApi
 
-    tickers = ['AMBA','PATH','PFE', 'SONY', 'TM', 'AEP', 'EPD', 'TSLA', 'GOOGL', 'IPG']
+    #Create PySpark SparkSession
+    spark = SparkSession.builder \
+        .master("local[1]") \
+        .appName("juaniInvestor") \
+        .getOrCreate()
+
+    tickers = ['WIRE']
     finalDF = pd.DataFrame()
 
-    finalDF = stockFundamentals()
-    print(finalDF)
+    finalDF = getStockFundamentals().join(getStockFinancials()) \
+        .join(getStockBalanceSheets()) \
+        .join(getStockDividends()) \
+        .join(getStockEarnings())
+
+
+    sparkDF = getStockCalculus()    
+    sparkDF.printSchema()
+    sparkDF.show()
+
+    sparkDF.write.option("header",True) \
+        .mode('overwrite') \
+        .parquet("data/portfolio_stocks.parquet")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Ingest Graham method data to Postgres billionsDB')
