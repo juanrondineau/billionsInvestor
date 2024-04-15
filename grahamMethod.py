@@ -42,7 +42,7 @@ def main(params):
                 yFinanceInfo['trailingEps'],
                 finVizFundamentsInfo['EPS past 5Y'][:len(finVizFundamentsInfo['EPS past 5Y'])-1] if finVizFundamentsInfo['EPS past 5Y'] != '-' else 0,
                 round(yFinanceInfo['returnOnEquity']*100,2),
-                round(yFinanceInfo['currentRatio'],2),
+                round(yFinanceInfo['currentRatio'],2) if 'currentRatio' in yFinanceInfo.keys() else 0,
                 finVizFundamentsInfo['LT Debt/Eq'],
                 round(yFinanceInfo['debtToEquity']/100,2) if 'debtToEquity' in yFinanceInfo.keys() else 0,
                 round(yFinanceInfo['currentPrice'],2)
