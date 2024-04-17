@@ -43,7 +43,6 @@ python 3 grahamMethod.py \
 PgAdmin
 ```bash
 http://localhost:8080/browser/
-http://localhost:3000/
 
 ```
 
