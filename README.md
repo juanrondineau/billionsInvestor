@@ -16,7 +16,7 @@ sudo chown -R 5050:5050 pgadminData
 Compose + image building
 
 ```bash
-docker-compose up
+docker-compose up -d
 docker build -t grahammethod:v001 .
 ```
 
@@ -43,4 +43,12 @@ python 3 grahamMethod.py \
 PgAdmin
 ```bash
 http://localhost:8080/browser/
+http://localhost:3000/
+
+```
+
+Metabase
+```bash
+http://localhost:3000/
+
 ```
