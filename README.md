@@ -17,7 +17,7 @@ sudo chmod a+rwx parquets
 Compose + image building
 
 ```bash
-docker-compose up
+docker-compose up -d
 docker build -t grahammethod:v001 .
 ```
 
@@ -44,4 +44,11 @@ python 3 grahamMethod.py \
 PgAdmin
 ```bash
 http://localhost:8080/browser/
+
+```
+
+Metabase
+```bash
+http://localhost:3000/
+
 ```
