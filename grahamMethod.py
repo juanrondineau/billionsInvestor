@@ -272,7 +272,7 @@ def main(params):
     #sparkDF.show()
 
     sparkDF.write.option("header",True) \
-        .mode('overwrite') \
+        .mode('append') \
         .parquet("/app/parquets/graham.parquet")
 
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
