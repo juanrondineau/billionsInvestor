@@ -1,0 +1,29 @@
+       
+        
+ docker run -it -v ./data/parquets:/app/parquets
+ 	--network=billionsinvestor_billionsNetwork \
+ 	grahammethod:v001 \
+        --password=root \
+        --host=pgdatabase \
+        --port=5432 \
+        --db=billionsDB \
+        --table_name=grahamStockMetrics \
+        --year=2023 \
+        --aplhaVantageApi=AN3GO9IIJDP6KJ09
+ 
+ docker run -it -v ./data/parquets:/app/parquets \
+  --network=billionsinvestor_billionsNetwork\
+  grahammethod:v001 
+ 
+
+
+ python3 grahamMethod.py  --user=root \
+        --password=root \
+        --host=pgdatabase \
+        --port=5432 \
+        --db=billionsDB \
+        --table_name=grahamStockMetrics \
+        --tickers_list=EWBC,STM,CB \
+        --year=2023 \
+        --aplhaVantageApi=AN3GO9IIJDP6KJ09
+

@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 import requests
 import json
 
+from datetime import datetime
 from sqlalchemy import create_engine
 from finvizfinance.quote import finvizfinance
 from pyspark.sql import SparkSession
@@ -45,13 +46,15 @@ def main(params):
                 round(yFinanceInfo['currentRatio'],2) if 'currentRatio' in yFinanceInfo.keys() else 0,
                 finVizFundamentsInfo['LT Debt/Eq'],
                 round(yFinanceInfo['debtToEquity']/100,2) if 'debtToEquity' in yFinanceInfo.keys() else 0,
-                round(yFinanceInfo['currentPrice'],2)
+                round(yFinanceInfo['currentPrice'],2),
+                datetime.now()
             ]
 
             tickersData.append(tickerData)
 
         columnsNames = ['Ticker','Company','Sector','Industry','Country','MarketCap(BN)','P/B', 'Dividend Yield(%)', 'Payout Ratio (%)', \
-                         'EPS(ttm)', 'EPS growth past 5 years(%)','ROE(%)', 'Current Ratio','LT Debt/Equity','Total Debt/Equity', 'Price',]
+                         'EPS(ttm)', 'EPS growth past 5 years(%)','ROE(%)', 'Current Ratio','LT Debt/Equity','Total Debt/Equity', 'Price', \
+                            'LastUpdate']
 
         df = pd.DataFrame(tickersData, index = tickers, columns=columnsNames )
 
@@ -270,7 +273,7 @@ def main(params):
 
     sparkDF.write.option("header",True) \
         .mode('overwrite') \
-        .parquet("data/portfolio_stocks.parquet")
+        .parquet("/app/parquets/graham.parquet")
 
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
 
