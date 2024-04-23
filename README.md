@@ -11,6 +11,8 @@ sudo chmod a+rwx billionsData
 sudo chmod a+rwx pgadminData
 #sudo chown -R 5050:5050 pgadminData
 sudo chmod a+rwx parquets
+sudo chmod a+rwx metabaseData
+sudo chown -R 5050:5050 metabaseData
 ```
 ## Docker Init
 
@@ -27,9 +29,7 @@ docker build -t grahammethod:v001 .
 Execute script
 
 ```bash
-docker run -it -v ./data/parquets:/app/parquets \
-        --network=billionsinvestor_billionsNetwork grahammethod:v001 
-
+docker run -it --network=billionsinvestor_billionsNetwork grahammethod:v001 
 python3 grahamMethod.py \
         --user=root \
         --password=root \
