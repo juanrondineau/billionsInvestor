@@ -37,7 +37,7 @@ python3 grahamMethod.py \
         --port=5432 \
         --db=billionsDB \
         --table_name=grahamStockMetrics \
-        --tickers_list=INTC,RY,CNQ,SU \
+        --tickers_list=TM,AAPL,MSFT,JPM,1398.HK,XOM,META,AMZN,EQNR \
         --year=2023 \
         --aplhaVantageApi=APIKEY
 ```

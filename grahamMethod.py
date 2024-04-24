@@ -42,9 +42,9 @@ def main(params):
                 round(yFinanceInfo['payoutRatio']*100,2) if 'payoutRatio' in yFinanceInfo.keys() else 0,
                 yFinanceInfo['trailingEps'],
                 finVizFundamentsInfo['EPS past 5Y'][:len(finVizFundamentsInfo['EPS past 5Y'])-1] if finVizFundamentsInfo['EPS past 5Y'] != '-' else 0,
-                round(yFinanceInfo['returnOnEquity']*100,2),
+                round(yFinanceInfo['returnOnEquity']*100,2) if 'returnOnEquity' in yFinanceInfo.keys() else 0,
                 round(yFinanceInfo['currentRatio'],2) if 'currentRatio' in yFinanceInfo.keys() else 0,
-                finVizFundamentsInfo['LT Debt/Eq'],
+                finVizFundamentsInfo['LT Debt/Eq'] if finVizFundamentsInfo['LT Debt/Eq'] != '-' else 0,
                 round(yFinanceInfo['debtToEquity']/100,2) if 'debtToEquity' in yFinanceInfo.keys() else 0,
                 round(yFinanceInfo['currentPrice'],2),
                 datetime.now()
